@@ -84,3 +84,4 @@ class Phpbb2ScrapyPipeline(object):
                 # Not sure what this is, just ignore the whole tag
                 continue
             newContent.replace(str(tag), spanCode)
+        return newContent
