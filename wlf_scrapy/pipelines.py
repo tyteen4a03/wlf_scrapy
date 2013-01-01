@@ -6,9 +6,6 @@ from wlf_scrapy.util import br2nl
 QUOTE_HTML = '<table width="90%" cellspacing="1" cellpadding="3" border="0" align="center"><tr> 	  <td><span class="genmed"><b>%{username}s</b></span></td>	</tr>	<tr>	  <td class="%{mode}s">%{content}s</td>	</tr></table>'
 
 TAGS_NOATTR = {
-    "b": "b",
-    "i": "i",
-    "u": "u",
     "ul": "list",
     "li": "*",
     }
@@ -35,7 +32,7 @@ class Phpbb2ScrapyPipeline(object):
                              br2nl(tag.find("td", attrs={"class": "quote"}).string) + "[/quote]"
                 mode = "quote"
             newContent.replace((QUOTE_HTML % {"username": username, "mode": mode, "content": tag.find("td", attrs={"class": mode}).string}), newContent)
-            # Undo tags with no attributes
+        # Undo tags with no attributes
         for tag, value in TAGS_NOATTR:
             for t in soup.find_all(tag):
                 newContent.replace(str(t), ("[" + value + "]" + t.string + "[/" + value + "]"))
@@ -47,12 +44,43 @@ class Phpbb2ScrapyPipeline(object):
                 continue
             urlMode = ("email" if tag["href"].startswith("mailto:") else "url")
             theURL = "[" + urlMode + (
-                ("]" + tag.string) if tag["href"] == tag.string and not urlMode == "email" else ("=" + tag["href"] + "]" + tag.string)
+                ("]" + tag.string) if (tag["href"] == tag.string and not urlMode == "email") else ("=" + tag["href"] + "]" + tag.string)
                 )  + "[/" + urlMode + "]"
             newContent.replace(str(tag), theURL)
-            # Undo IMG tag
+        # Undo IMG tag
         for tag in soup.find_all("img"):
             # Check if it's a smiley
-            newContent.replace(str(tag), ("[img]" + tag["src"] + "[/img]"))
-            # Undo
-
+            imgBB = "[img]" + tag["src"] + "[/img]"
+            newContent.replace(str(tag), imgBB)
+            if tag["src"].find("http://pcpuzzle.com/forum/images/smiles/"):
+                # Undo smiley
+                smileyname = tag["src"].partition("http://pcpuzzle.com/forum/images/smiles/")[2][:-4]
+                newContent.replace(imgBB, (":" + smileyname + ":"))
+        # Undo text elements (i.e <span>)
+        def spanStyle(tag):
+            return tag.name == "span" and tag.has_key("style")
+        for tag in soup.find_all(spanStyle):
+            tagStyle = tag["style"]
+            if tagStyle.startswith("color: "):
+                # Color
+                spanCode = "[color=" + tagStyle[6:] + "]" + tag.string + "[/color]"
+            elif tagStyle.startswith("font-size: "):
+                # Size
+                fontSize = int(tag["style"].partition("font-size: ")[2].partition("px; line-height: normal")[0])
+                if fontSize < 0 or fontSize > 29: # Invalid sizes
+                    spanCode = tag.string
+                else:
+                    spanCode = "[size=" + fontSize + "]" + tag.string + "[/size]"
+            elif tagStyle == "font-weight: bold":
+                # Bold
+                spanCode = "[b]" + tag.string + "[/b]"
+            elif tagStyle == "font-style: italic":
+                # Italic
+                spanCode = "[i]" + tag.string + "[/i"]
+            elif tagStyle == "text-decoration: underline":
+                # Underline
+                spanCode = "[u]" + tag.string + "[/u]"
+            else:
+                # Not sure what this is, just ignore the whole tag
+                continue
+            newContent.replace(str(tag), spanCode)

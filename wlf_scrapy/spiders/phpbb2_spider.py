@@ -98,7 +98,7 @@ class WLFSpider(BaseSpider):
         def spanClass(tag):
             theList = [i for i in tag.strings]
             try:
-                c = theList[0].startswith("Posted: ")
+                c = theList[0].find("Posted: ")
             except IndexError:
                 return False
             return tag.name == "span" and tag.has_key("class") and c
