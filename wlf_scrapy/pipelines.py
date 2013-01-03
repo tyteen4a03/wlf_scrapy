@@ -1,14 +1,18 @@
 # Wonderland Forum Scraping Bot made by tyteen4a03
 # All rights reserved.
 
-from wlf_scrapy.util import br2nl
+from bs4 import BeautifulSoup
 
-QUOTE_HTML = '<table width="90%" cellspacing="1" cellpadding="3" border="0" align="center"><tr> 	  <td><span class="genmed"><b>%{username}s</b></span></td>	</tr>	<tr>	  <td class="%{mode}s">%{content}s</td>	</tr></table>'
+from util import br2nl
 
+QUOTE_HTML = '<table width="90%" cellspacing="1" cellpadding="3" border="0" align="center"><tr> 	  <td><span class="genmed"><b>{0}</b></span></td>	</tr>	<tr>	  <td class="{1}">{2}</td>	</tr></table>'
 TAGS_NOATTR = {
     "ul": "list",
     "li": "*",
     }
+
+def spanStyle(tag):
+    return tag.name == "span" and tag.has_key("style")
 
 class Phpbb2ScrapyPipeline(object):
     def process_item(self, item, spider):
@@ -25,13 +29,13 @@ class Phpbb2ScrapyPipeline(object):
             attrs={"width": "90%", "cellspacing": 1, "cellpadding": 3, "border": 0, "align": "center"}):
             username = tag.find("span", attrs={"class": "genmed"}).b.string
             if username == "Code:":
-                newContent = "[code]" + br2nl(tag.find("td", attrs={"class": "code"}).string) + "[/code]"
+                quoteBB = "[code]" + br2nl(tag.find("td", attrs={"class": "code"}).string) + "[/code]"
                 mode = "code"
             else:
-                newContent = (('[quote="' + username.rstrip(": ", 1)  + '"]') if username != "Quote: " else ("[quote]")) +\
-                             br2nl(tag.find("td", attrs={"class": "quote"}).string) + "[/quote]"
+                quoteBB = (('[quote="' + username.rstrip(": ")  + '"]') if username != "Quote: " else ("[quote]")) +\
+                             br2nl(str(tag.find("td", attrs={"class": "quote"}))) + "[/quote]"
                 mode = "quote"
-            newContent.replace((QUOTE_HTML % {"username": username, "mode": mode, "content": tag.find("td", attrs={"class": mode}).string}), newContent)
+            newContent.replace((QUOTE_HTML.format(username, mode, (tag.find("td", attrs={"class": mode}).string))), quoteBB)
         # Undo tags with no attributes
         for tag, value in TAGS_NOATTR:
             for t in soup.find_all(tag):
@@ -57,8 +61,6 @@ class Phpbb2ScrapyPipeline(object):
                 smileyname = tag["src"].partition("http://pcpuzzle.com/forum/images/smiles/")[2][:-4]
                 newContent.replace(imgBB, (":" + smileyname + ":"))
         # Undo text elements (i.e <span>)
-        def spanStyle(tag):
-            return tag.name == "span" and tag.has_key("style")
         for tag in soup.find_all(spanStyle):
             tagStyle = tag["style"]
             if tagStyle.startswith("color: "):
@@ -70,13 +72,13 @@ class Phpbb2ScrapyPipeline(object):
                 if fontSize < 0 or fontSize > 29: # Invalid sizes
                     spanCode = tag.string
                 else:
-                    spanCode = "[size=" + fontSize + "]" + tag.string + "[/size]"
+                    spanCode = "[size=" + str(fontSize) + "]" + tag.string + "[/size]"
             elif tagStyle == "font-weight: bold":
                 # Bold
                 spanCode = "[b]" + tag.string + "[/b]"
             elif tagStyle == "font-style: italic":
                 # Italic
-                spanCode = "[i]" + tag.string + "[/i"]
+                spanCode = "[i]" + tag.string + "[/i]"
             elif tagStyle == "text-decoration: underline":
                 # Underline
                 spanCode = "[u]" + tag.string + "[/u]"
@@ -84,4 +86,7 @@ class Phpbb2ScrapyPipeline(object):
                 # Not sure what this is, just ignore the whole tag
                 continue
             newContent.replace(str(tag), spanCode)
+        # Undo <br />
+        newContent = br2nl(newContent)
+        print "Le Done"
         return newContent

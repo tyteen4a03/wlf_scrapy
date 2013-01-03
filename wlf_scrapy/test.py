@@ -1,4 +1,4 @@
-from wlf_scrapy import pipeline
+from pipelines import Phpbb2ScrapyPipeline
 
 CONTENT = """
 <table width="90%" cellspacing="1" cellpadding="3" border="0" align="center"><tr> 	  <td><span class="genmed"><b>Quote:</b></span></td>	</tr>	<tr>	  <td class="quote"><span style="font-weight: bold"><span style="font-style: italic"><span style="text-decoration: underline">Content</span></span></span>
